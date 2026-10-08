@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Hand Tracking - Magic Window</title>
+    <!-- Tải thư viện nhận diện bàn tay của Google MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        video {
+            display: none; /* Ẩn video gốc, chỉ vẽ lên canvas */
+        }
+        canvas {
+            border: 1px solid #333;
+            max-width: 100%;
+            max-height: 100vh;
+            /* Lật ngược canvas giống như đang soi gương */
+            transform: scaleX(-1); 
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #0ff;
+            z-index: 10;
+            text-shadow: 0 0 10px #0ff;
+        }
+        #ui-text {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #0ff;
+            font-size: 14px;
+            text-shadow: 0 0 5px rgba(0,255,255,0.5);
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Đang khởi động Camera và AI...</div>
+    
+    <div id="ui-text">
+        MODE: MAGIC WINDOW 2D<br>
+        FILTER: INVERT (Đưa 2 tay lên để kích hoạt)
+    </div>
+
+    <div class="container">
+        <video id="input_video" autoplay playsinline></video>
+        <canvas id="output_canvas" width="1280" height="720"></canvas>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const loadingText = document.getElementById('loading');
+
+        // Hàm xử lý khi AI nhận diện được bàn tay
+        function onResults(results) {
+            // Ẩn chữ loading khi bắt đầu có luồng hình ảnh
+            loadingText.style.display = 'none'; 
+            
+            canvasCtx.save();
+            // Xoá khung hình cũ
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            // 1. Vẽ video gốc làm nền
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            // Kiểm tra xem có nhận diện được ít nhất 2 bàn tay không
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length >= 2) {
+                const hand1 = results.multiHandLandmarks[0];
+                const hand2 = results.multiHandLandmarks[1];
+
+                const w = canvasElement.width;
+                const h = canvasElement.height;
+
+                // Lấy toạ độ ngón cái (điểm số 4) và ngón trỏ (điểm số 8) của 2 tay
+                const p1 = { x: hand1[8].x * w, y: hand1[8].y * h }; // Trỏ tay 1
+                const p2 = { x: hand1[4].x * w, y: hand1[4].y * h }; // Cái tay 1
+                const p3 = { x: hand2[4].x * w, y: hand2[4].y * h }; // Cái tay 2
+                const p4 = { x: hand2[8].x * w, y: hand2[8].y * h }; // Trỏ tay 2
+
+                canvasCtx.save();
+                
+                // Tạo một hình đa giác (polygon) nối 4 điểm ngón tay lại với nhau
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(p1.x, p1.y);
+                canvasCtx.lineTo(p2.x, p2.y);
+                canvasCtx.lineTo(p3.x, p3.y);
+                canvasCtx.lineTo(p4.x, p4.y);
+                canvasCtx.closePath();
+
+                // CẮT (Clip): Giới hạn khu vực vẽ tiếp theo chỉ nằm trong hình đa giác vừa tạo
+                canvasCtx.clip();
+
+                // Tạo filter âm bản (Invert) giống trong ảnh bạn gửi
+                canvasCtx.filter = 'invert(100%)'; 
+                // Bạn có thể đổi thử thành: 'sepia(100%)' hoặc 'hue-rotate(90deg)'
+
+                // Vẽ lại video một lần nữa. Lần này nó sẽ bị áp filter và chỉ lọt vào vùng đa giác
+                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+                
+                // Phục hồi lại canvas bình thường (bỏ vùng cắt và filter đi)
+                canvasCtx.restore();
+
+                // Vẽ viền sáng phát quang (Glow effect) bao quanh khung ma thuật
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(p1.x, p1.y);
+                canvasCtx.lineTo(p2.x, p2.y);
+                canvasCtx.lineTo(p3.x, p3.y);
+                canvasCtx.lineTo(p4.x, p4.y);
+                canvasCtx.closePath();
+                
+                canvasCtx.lineWidth = 3;
+                canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                canvasCtx.shadowColor = 'rgba(200, 255, 255, 1)';
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.stroke();
+                
+                // Vẽ các chấm sáng nhỏ tại các đầu ngón tay
+                [p1, p2, p3, p4].forEach(p => {
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+                    canvasCtx.fillStyle = '#fff';
+                    canvasCtx.fill();
+                });
+            }
+            canvasCtx.restore();
+        }
+
+        // Khởi tạo thư viện MediaPipe Hands
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+        
+        // Cấu hình AI
+        hands.setOptions({
+            maxNumHands: 2, // Bắt buộc nhận diện tối đa 2 tay
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7, // Độ nhạy phát hiện tay
+            minTrackingConfidence: 0.7   // Độ nhạy theo dõi di chuyển
+        });
+        
+        hands.onResults(onResults);
+
+        // Khởi động Camera và liên tục đẩy frame ảnh vào AI
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 1280,
+            height: 720
+        });
+        
+        camera.start();
+    </script>
+</body>
+</html>
