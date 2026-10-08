@@ -2,183 +2,517 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Hand Tracking - Magic Window</title>
-    <!-- Tải thư viện nhận diện bàn tay của Google MediaPipe -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cyber Hand AR - VNhat2202</title>
+    <!-- MediaPipe & Tone.js Audio Synth -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js" crossorigin="anonymous"></script>
+
     <style>
-        body {
+        * {
+            box-sizing: border-box;
+            touch-action: none;
+            user-select: none;
             margin: 0;
             padding: 0;
-            background-color: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            color: white;
-            font-family: monospace;
-            overflow: hidden;
         }
-        .container {
-            position: relative;
+        body, html {
             width: 100%;
             height: 100%;
+            background-color: #030308;
+            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* --- MÀN HÌNH MỞ ĐẦU / INTRO SPLASH --- */
+        #intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #0e1726 0%, #020205 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #00ffcc;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+            overflow-y: auto;
+        }
+        #intro-screen.hide {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .intro-title {
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px #00ffcc, 0 0 30px rgba(0, 255, 204, 0.4);
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        .intro-author {
+            font-size: 13px;
+            color: #fff;
+            background: rgba(0, 255, 204, 0.15);
+            border: 1px solid #00ffcc;
+            padding: 4px 12px;
+            border-radius: 4px;
+            margin-bottom: 18px;
+            text-shadow: 0 0 5px #00ffcc;
+            text-align: center;
+        }
+        .intro-card {
+            background: rgba(4, 9, 20, 0.85);
+            border: 1px solid rgba(0, 255, 204, 0.35);
+            border-radius: 8px;
+            padding: 14px 18px;
+            max-width: 380px;
+            width: 100%;
+            font-size: 11.5px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
+        }
+        .intro-card .highlight {
+            color: #ff007f;
+            font-weight: bold;
+        }
+        .intro-card .white {
+            color: #ffffff;
+            font-weight: bold;
+        }
+        .stk-box {
+            background: rgba(255, 0, 127, 0.1);
+            border: 1px dashed #ff007f;
+            border-radius: 4px;
+            padding: 8px 10px;
+            margin: 10px 0;
+            text-align: center;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .copy-btn {
+            background: #ff007f;
+            color: #fff;
+            border: none;
+            padding: 4px 8px;
+            font-family: inherit;
+            font-size: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .copy-btn:active {
+            opacity: 0.7;
+        }
+        .start-btn {
+            background: transparent;
+            border: 2px solid #00ffcc;
+            color: #00ffcc;
+            padding: 12px 28px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+            animation: pulse-border 1.8s infinite;
+        }
+        .start-btn:active {
+            background: #00ffcc;
+            color: #020205;
+        }
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); transform: scale(1); }
+            50% { box-shadow: 0 0 25px rgba(0, 255, 204, 0.7); transform: scale(1.03); }
+        }
+
+        /* --- MÀN HÌNH CHÍNH (CAMERA + CANVAS) --- */
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
         }
         video {
-            display: none; /* Ẩn video gốc, chỉ vẽ lên canvas */
+            display: none;
         }
         canvas {
-            border: 1px solid #333;
-            max-width: 100%;
-            max-height: 100vh;
-            /* Lật ngược canvas giống như đang soi gương */
-            transform: scaleX(-1); 
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scaleX(-1);
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #rotate-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 20;
+            background: rgba(0, 255, 204, 0.15);
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            padding: 8px 12px;
+            font-family: monospace;
+            font-size: 11px;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+        #rotate-btn:active {
+            background: #00ffcc;
+            color: #000;
         }
         #loading {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 24px;
-            color: #0ff;
+            color: #00ffcc;
+            font-size: 13px;
+            letter-spacing: 1px;
             z-index: 10;
-            text-shadow: 0 0 10px #0ff;
-        }
-        #ui-text {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #0ff;
-            font-size: 14px;
-            text-shadow: 0 0 5px rgba(0,255,255,0.5);
+            text-align: center;
             pointer-events: none;
-            z-index: 5;
         }
     </style>
 </head>
 <body>
-    <div id="loading">Đang khởi động Camera và AI...</div>
-    
-    <div id="ui-text">
-        MODE: MAGIC WINDOW 2D<br>
-        FILTER: INVERT (Đưa 2 tay lên để kích hoạt)
+
+    <!-- MÀN HÌNH MỞ ĐẦU (INTRO) -->
+    <div id="intro-screen">
+        <div class="intro-title">CYBER HAND AR MATRIX</div>
+        <div class="intro-author">Đây là APK đầu tiên của VNhat2202</div>
+
+        <div class="intro-card">
+            <div class="highlight">[ THÔNG TIN ỨNG DỤNG ]</div>
+            • Phiên bản: <span class="white">v1.0.0 (Release)</span><br>
+            • AI Core: <span class="white">MediaPipe Hand Landmark 3D</span><br>
+            • Tính năng: Lăng kính đa tầng, toạ độ Hologram HUD, RGB Glitch, Neon Scanline.<br>
+            
+            <div class="stk-box">
+                <span>Donate / STK: <strong>0385959076</strong></span>
+                <button class="copy-btn" id="copy-btn">COPY</button>
+            </div>
+
+            <div class="highlight" style="margin-top: 6px;">[ HƯỚNG DẪN CỬ CHỈ ]</div>
+            • <span class="white">Chụm Cái + Út</span>: Tăng dần số lượng ngón tay (1 ➔ 4 vùng ma trận).<br>
+            • <span class="white">Chụm Cái + Trỏ</span>: Đổi hiệu ứng công nghệ không trùng lặp.<br>
+            • <span class="white">Nút [⟳ XOAY]</span>: Khóa xoay ngang hoặc dọc linh hoạt.
+        </div>
+
+        <button class="start-btn" id="start-btn">KHỞI ĐỘNG HỆ THỐNG</button>
     </div>
 
-    <div class="container">
-        <video id="input_video" autoplay playsinline></video>
-        <canvas id="output_canvas" width="1280" height="720"></canvas>
+    <!-- GIAO DIỆN CHÍNH -->
+    <div id="loading">CONNECTING NEURAL CAMERA...</div>
+    <button id="rotate-btn">⟳ XOAY NGANG</button>
+
+    <div id="container">
+        <video id="input_video" autoplay playsinline webkit-playsinline></video>
+        <canvas id="output_canvas"></canvas>
     </div>
 
     <script>
+        const introScreen = document.getElementById('intro-screen');
+        const startBtn = document.getElementById('start-btn');
+        const copyBtn = document.getElementById('copy-btn');
         const videoElement = document.getElementById('input_video');
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
         const loadingText = document.getElementById('loading');
+        const rotateBtn = document.getElementById('rotate-btn');
 
-        // Hàm xử lý khi AI nhận diện được bàn tay
+        let screenW = window.innerWidth;
+        let screenH = window.innerHeight;
+
+        const offCanvas = document.createElement('canvas');
+        const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+        const pixelCanvas = document.createElement('canvas');
+        const pixelCtx = pixelCanvas.getContext('2d');
+
+        // Nút sao chép STK
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText('0385959076').then(() => {
+                copyBtn.innerText = 'ĐÃ COPY';
+                setTimeout(() => { copyBtn.innerText = 'COPY'; }, 2000);
+            }).catch(() => {
+                alert('STK: 0385959076');
+            });
+        });
+
+        // Âm thanh Sci-Fi Tone.js
+        const synth = new Tone.Synth({
+            oscillator: { type: "sine" },
+            envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
+        }).toDestination();
+
+        function playSound(freq) {
+            try {
+                if (Tone.context.state === 'running') {
+                    synth.triggerAttackRelease(freq, "16n");
+                }
+            } catch(e) {}
+        }
+
+        // KHI BẤM NÚT BẮT ĐẦU Ở INTRO
+        startBtn.addEventListener('click', async () => {
+            await Tone.start();
+            playSound("E5");
+            setTimeout(() => playSound("B5"), 120);
+
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen().catch(() => {});
+                }
+            } catch(e) {}
+
+            introScreen.classList.add('hide');
+            startCamera();
+        });
+
+        function updateScreenDimensions() {
+            screenW = window.innerWidth;
+            screenH = window.innerHeight;
+            canvasElement.width = screenW;
+            canvasElement.height = screenH;
+            offCanvas.width = screenW;
+            offCanvas.height = screenH;
+
+            rotateBtn.innerText = screenW > screenH ? "⟳ XOAY DỌC" : "⟳ XOAY NGANG";
+        }
+        updateScreenDimensions();
+
+        window.addEventListener('resize', updateScreenDimensions);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(updateScreenDimensions, 250);
+        });
+
+        rotateBtn.addEventListener('click', async () => {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    if (screenW < screenH) {
+                        await screen.orientation.lock('landscape').catch(() => {});
+                    } else {
+                        await screen.orientation.lock('portrait').catch(() => {});
+                    }
+                }
+            } catch (err) {}
+        });
+
+        const ALL_POSSIBLE_ZONES = [
+            { i1: 4,  i2: 8,  color: "#00ffff" },
+            { i1: 8,  i2: 12, color: "#ff007f" },
+            { i1: 12, i2: 16, color: "#39ff14" },
+            { i1: 16, i2: 20, color: "#bd00ff" }
+        ];
+
+        const FX_LIST = ['rgb_glitch', 'hologram_scan', 'neon_edge', 'night_vision', 'digital_pixel'];
+        let activeZoneCount = 1;
+        let lastZoneTime = 0;
+        let lastFXTime = 0;
+        let assignedFX = [];
+        let scanlineOffset = 0;
+
+        function shuffleFX() {
+            const shuffled = [...FX_LIST].sort(() => 0.5 - Math.random());
+            assignedFX = shuffled.slice(0, 4);
+        }
+        shuffleFX();
+
+        function getDistance(p1, p2) {
+            return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+        }
+
+        // --- CÁC HIỆU ỨNG NHIỄU CÔNG NGHỆ ---
+        function renderRGBGlitch(image, w, h) {
+            offCtx.drawImage(image, 0, 0, w, h);
+            for (let i = 0; i < 3; i++) {
+                const sliceY = Math.random() * h;
+                const sliceH = Math.random() * 25 + 10;
+                const offset = (Math.random() - 0.5) * 30;
+                offCtx.drawImage(image, 0, sliceY, w, sliceH, offset, sliceY, w, sliceH);
+            }
+        }
+
+        function renderHologram(image, w, h) {
+            offCtx.drawImage(image, 0, 0, w, h);
+            offCtx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+            offCtx.fillRect(0, 0, w, h);
+            scanlineOffset = (scanlineOffset + 6) % h;
+            offCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            offCtx.fillRect(0, scanlineOffset, w, 3);
+        }
+
+        function renderNeonEdge(image, w, h) {
+            offCtx.filter = 'contrast(250%) invert(100%) hue-rotate(90deg)';
+            offCtx.drawImage(image, 0, 0, w, h);
+            offCtx.filter = 'none';
+        }
+
+        function renderNightVision(image, w, h) {
+            offCtx.filter = 'grayscale(100%) contrast(150%)';
+            offCtx.drawImage(image, 0, 0, w, h);
+            offCtx.filter = 'none';
+            offCtx.fillStyle = 'rgba(0, 255, 80, 0.35)';
+            offCtx.fillRect(0, 0, w, h);
+        }
+
+        function renderDigitalPixel(image, w, h, size = 16) {
+            pixelCanvas.width = Math.max(1, Math.floor(w / size));
+            pixelCanvas.height = Math.max(1, Math.floor(h / size));
+            pixelCtx.drawImage(image, 0, 0, pixelCanvas.width, pixelCanvas.height);
+            offCtx.imageSmoothingEnabled = false;
+            offCtx.drawImage(pixelCanvas, 0, 0, pixelCanvas.width, pixelCanvas.height, 0, 0, w, h);
+            offCtx.imageSmoothingEnabled = true;
+        }
+
         function onResults(results) {
-            // Ẩn chữ loading khi bắt đầu có luồng hình ảnh
-            loadingText.style.display = 'none'; 
-            
+            loadingText.style.display = 'none';
+            const w = canvasElement.width;
+            const h = canvasElement.height;
+
             canvasCtx.save();
-            // Xoá khung hình cũ
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            
-            // 1. Vẽ video gốc làm nền
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.clearRect(0, 0, w, h);
+            canvasCtx.drawImage(results.image, 0, 0, w, h);
 
-            // Kiểm tra xem có nhận diện được ít nhất 2 bàn tay không
             if (results.multiHandLandmarks && results.multiHandLandmarks.length >= 2) {
-                const hand1 = results.multiHandLandmarks[0];
-                const hand2 = results.multiHandLandmarks[1];
+                let hA = results.multiHandLandmarks[0];
+                let hB = results.multiHandLandmarks[1];
+                if (hA[0].x > hB[0].x) {
+                    const temp = hA; hA = hB; hB = temp;
+                }
 
-                const w = canvasElement.width;
-                const h = canvasElement.height;
+                const now = Date.now();
 
-                // Lấy toạ độ ngón cái (điểm số 4) và ngón trỏ (điểm số 8) của 2 tay
-                const p1 = { x: hand1[8].x * w, y: hand1[8].y * h }; // Trỏ tay 1
-                const p2 = { x: hand1[4].x * w, y: hand1[4].y * h }; // Cái tay 1
-                const p3 = { x: hand2[4].x * w, y: hand2[4].y * h }; // Cái tay 2
-                const p4 = { x: hand2[8].x * w, y: hand2[8].y * h }; // Trỏ tay 2
+                // Cử chỉ: Cái + Út (Tăng số lượng ngón / vùng)
+                if ((getDistance(hA[4], hA[20]) < 0.05 || getDistance(hB[4], hB[20]) < 0.05) && now - lastZoneTime > 800) {
+                    activeZoneCount = (activeZoneCount % 4) + 1;
+                    playSound("A4");
+                    lastZoneTime = now;
+                }
 
-                canvasCtx.save();
-                
-                // Tạo một hình đa giác (polygon) nối 4 điểm ngón tay lại với nhau
-                canvasCtx.beginPath();
-                canvasCtx.moveTo(p1.x, p1.y);
-                canvasCtx.lineTo(p2.x, p2.y);
-                canvasCtx.lineTo(p3.x, p3.y);
-                canvasCtx.lineTo(p4.x, p4.y);
-                canvasCtx.closePath();
+                // Cử chỉ: Cái + Trỏ (Đổi hiệu ứng)
+                if ((getDistance(hA[4], hA[8]) < 0.045 || getDistance(hB[4], hB[8]) < 0.045) && now - lastFXTime > 800) {
+                    shuffleFX();
+                    playSound("D5");
+                    lastFXTime = now;
+                }
 
-                // CẮT (Clip): Giới hạn khu vực vẽ tiếp theo chỉ nằm trong hình đa giác vừa tạo
-                canvasCtx.clip();
+                for (let i = 0; i < activeZoneCount; i++) {
+                    const zone = ALL_POSSIBLE_ZONES[i];
+                    const fx = assignedFX[i];
 
-                // Tạo filter âm bản (Invert) giống trong ảnh bạn gửi
-                canvasCtx.filter = 'invert(100%)'; 
-                // Bạn có thể đổi thử thành: 'sepia(100%)' hoặc 'hue-rotate(90deg)'
+                    const p1 = { x: hA[zone.i1].x * w, y: hA[zone.i1].y * h };
+                    const p2 = { x: hA[zone.i2].x * w, y: hA[zone.i2].y * h };
+                    const p3 = { x: hB[zone.i2].x * w, y: hB[zone.i2].y * h };
+                    const p4 = { x: hB[zone.i1].x * w, y: hB[zone.i1].y * h };
 
-                // Vẽ lại video một lần nữa. Lần này nó sẽ bị áp filter và chỉ lọt vào vùng đa giác
-                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-                
-                // Phục hồi lại canvas bình thường (bỏ vùng cắt và filter đi)
-                canvasCtx.restore();
-
-                // Vẽ viền sáng phát quang (Glow effect) bao quanh khung ma thuật
-                canvasCtx.beginPath();
-                canvasCtx.moveTo(p1.x, p1.y);
-                canvasCtx.lineTo(p2.x, p2.y);
-                canvasCtx.lineTo(p3.x, p3.y);
-                canvasCtx.lineTo(p4.x, p4.y);
-                canvasCtx.closePath();
-                
-                canvasCtx.lineWidth = 3;
-                canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                canvasCtx.shadowColor = 'rgba(200, 255, 255, 1)';
-                canvasCtx.shadowBlur = 15;
-                canvasCtx.stroke();
-                
-                // Vẽ các chấm sáng nhỏ tại các đầu ngón tay
-                [p1, p2, p3, p4].forEach(p => {
+                    canvasCtx.save();
                     canvasCtx.beginPath();
-                    canvasCtx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
-                    canvasCtx.fillStyle = '#fff';
-                    canvasCtx.fill();
+                    canvasCtx.moveTo(p1.x, p1.y);
+                    canvasCtx.lineTo(p2.x, p2.y);
+                    canvasCtx.lineTo(p3.x, p3.y);
+                    canvasCtx.lineTo(p4.x, p4.y);
+                    canvasCtx.closePath();
+                    canvasCtx.clip();
+
+                    if (fx === 'rgb_glitch') renderRGBGlitch(results.image, w, h);
+                    else if (fx === 'hologram_scan') renderHologram(results.image, w, h);
+                    else if (fx === 'neon_edge') renderNeonEdge(results.image, w, h);
+                    else if (fx === 'night_vision') renderNightVision(results.image, w, h);
+                    else if (fx === 'digital_pixel') renderDigitalPixel(results.image, w, h);
+
+                    canvasCtx.drawImage(offCanvas, 0, 0, w, h);
+                    canvasCtx.restore();
+
+                    // Khung viền laser
+                    canvasCtx.beginPath();
+                    canvasCtx.moveTo(p1.x, p1.y);
+                    canvasCtx.lineTo(p2.x, p2.y);
+                    canvasCtx.lineTo(p3.x, p3.y);
+                    canvasCtx.lineTo(p4.x, p4.y);
+                    canvasCtx.closePath();
+                    canvasCtx.lineWidth = 2;
+                    canvasCtx.strokeStyle = zone.color;
+                    canvasCtx.shadowColor = zone.color;
+                    canvasCtx.shadowBlur = 8;
+                    canvasCtx.stroke();
+                }
+
+                // Điểm ngắm và toạ độ nhỏ
+                const activeJoints = new Set();
+                for (let i = 0; i < activeZoneCount; i++) {
+                    activeJoints.add(ALL_POSSIBLE_ZONES[i].i1);
+                    activeJoints.add(ALL_POSSIBLE_ZONES[i].i2);
+                }
+
+                [hA, hB].forEach(hand => {
+                    activeJoints.forEach(jIdx => {
+                        const pt = hand[jIdx];
+                        const px = pt.x * w;
+                        const py = pt.y * h;
+
+                        canvasCtx.shadowBlur = 0;
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(px, py, 4, 0, 2 * Math.PI);
+                        canvasCtx.strokeStyle = '#00ffff';
+                        canvasCtx.lineWidth = 1.2;
+                        canvasCtx.stroke();
+
+                        canvasCtx.fillStyle = '#00ffff';
+                        canvasCtx.font = '8px monospace';
+                        canvasCtx.fillText(`${px.toFixed(0)},${py.toFixed(0)}`, px + 6, py - 4);
+                    });
                 });
             }
             canvasCtx.restore();
         }
 
-        // Khởi tạo thư viện MediaPipe Hands
         const hands = new Hands({locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
         }});
-        
-        // Cấu hình AI
+
         hands.setOptions({
-            maxNumHands: 2, // Bắt buộc nhận diện tối đa 2 tay
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7, // Độ nhạy phát hiện tay
-            minTrackingConfidence: 0.7   // Độ nhạy theo dõi di chuyển
+            maxNumHands: 2,
+            modelComplexity: 0,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
         });
-        
+
         hands.onResults(onResults);
 
-        // Khởi động Camera và liên tục đẩy frame ảnh vào AI
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({image: videoElement});
-            },
-            width: 1280,
-            height: 720
-        });
-        
-        camera.start();
+        let cameraInstance = null;
+        function startCamera() {
+            if (!cameraInstance) {
+                cameraInstance = new Camera(videoElement, {
+                    onFrame: async () => {
+                        await hands.send({image: videoElement});
+                    },
+                    facingMode: 'user',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                });
+                cameraInstance.start().catch(() => {
+                    loadingText.innerHTML = "LỖI CAMERA: Hãy bật quyền Camera trong Cài Đặt của máy!";
+                });
+            }
+        }
     </script>
 </body>
 </html>
